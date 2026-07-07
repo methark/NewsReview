@@ -48,10 +48,18 @@ final class FactChecker
      */
     private static function pickTitle(array $cluster): string
     {
-        // Shortest headline tends to be the least editorialized ("X dies at 90"
-        // vs "Beloved icon X tragically passes at 90").
+        // Prefer headlines free of loaded language; among those, the shortest
+        // tends to be the least editorialized ("X dies at 90" vs "Beloved icon
+        // X tragically passes at 90"). Fall back to shortest overall only if
+        // every headline in the cluster contains bias language.
         $titles = array_map(static fn (array $a): string => $a['title'], $cluster);
         usort($titles, static fn (string $a, string $b): int => mb_strlen($a) <=> mb_strlen($b));
+
+        foreach ($titles as $title) {
+            if (!TextUtils::isBiased($title)) {
+                return $title;
+            }
+        }
         return $titles[0];
     }
 
