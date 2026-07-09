@@ -144,13 +144,22 @@ final class FeedFetcher
     {
         $previous = libxml_use_internal_errors(true);
 
+        // Not every libxml constant is guaranteed to be defined on every
+        // PHP build (some bundled Windows libxml2 DLLs conditionally lack
+        // LIBXML_RECOVER/LIBXML_PARSEHUGE support, which then leaves the
+        // PHP constant undefined entirely) — referencing a missing one
+        // directly is a fatal error, not a warning, so build the flag mask
+        // only from constants that actually exist in this runtime.
+        $baseFlags = self::libxmlFlags(['LIBXML_NOCDATA']);
+        $recoveryFlags = self::libxmlFlags(['LIBXML_NOCDATA', 'LIBXML_RECOVER', 'LIBXML_PARSEHUGE']);
+
         // Real-world feeds are frequently not quite well-formed (unescaped
         // "&", stray control characters, mismatched encoding declarations).
         // Try a strict parse first, then fall back to libxml's recovery mode
         // rather than discarding the whole feed over a minor validity issue.
-        $xml = simplexml_load_string($body, \SimpleXMLElement::class, LIBXML_NOCDATA);
+        $xml = simplexml_load_string($body, \SimpleXMLElement::class, $baseFlags);
         if ($xml === false) {
-            $xml = simplexml_load_string($body, \SimpleXMLElement::class, LIBXML_NOCDATA | LIBXML_RECOVER | LIBXML_PARSEHUGE);
+            $xml = simplexml_load_string($body, \SimpleXMLElement::class, $recoveryFlags);
         }
 
         libxml_clear_errors();
@@ -179,6 +188,26 @@ final class FeedFetcher
         }
 
         return array_values(array_filter($items, static fn (?array $a): bool => $a !== null && $a['title'] !== ''));
+    }
+
+    /**
+     * ORs together whichever of the named libxml constants actually exist
+     * in this PHP build. Referencing an undefined constant directly is a
+     * fatal error (not just a no-op), and not every libxml constant is
+     * guaranteed present on every build — some bundled Windows libxml2 DLLs
+     * conditionally lack LIBXML_RECOVER/LIBXML_PARSEHUGE support.
+     *
+     * @param string[] $constantNames
+     */
+    private static function libxmlFlags(array $constantNames): int
+    {
+        $flags = 0;
+        foreach ($constantNames as $name) {
+            if (defined($name)) {
+                $flags |= constant($name);
+            }
+        }
+        return $flags;
     }
 
     /**
