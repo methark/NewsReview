@@ -158,6 +158,27 @@ body {
     height: 1px;
 }
 
+.load-more-row {
+    display: flex;
+    justify-content: center;
+}
+
+.load-more-button {
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.load-more-button:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
 .scroll-status {
     text-align: center;
     color: var(--text-muted);

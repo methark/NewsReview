@@ -159,7 +159,10 @@ function formatDateTime(?int $timestamp): string
 
     <?php if (count($stories) > (int) $config['stories_per_batch']): ?>
     <div id="scrollSentinel" class="scroll-sentinel" aria-hidden="true"></div>
-    <p id="scrollStatus" class="scroll-status"></p>
+    <div class="load-more-row">
+        <button type="button" id="loadMoreButton" class="load-more-button"></button>
+    </div>
+    <p id="scrollStatus" class="scroll-status" hidden>All validated stories for this run are shown.</p>
     <?php endif; ?>
 </main>
 
@@ -172,13 +175,18 @@ function formatDateTime(?int $timestamp): string
 (function () {
     var list = document.getElementById('storyList');
     var sentinel = document.getElementById('scrollSentinel');
-    if (!list || !sentinel) {
+    var button = document.getElementById('loadMoreButton');
+    var status = document.getElementById('scrollStatus');
+    if (!list || !sentinel || !button) {
         return;
     }
 
     var batchSize = parseInt(list.dataset.batchSize, 10) || 10;
-    var status = document.getElementById('scrollStatus');
     var hiddenCards = Array.prototype.slice.call(list.querySelectorAll('.story-card[hidden]'));
+
+    function updateButtonLabel() {
+        button.textContent = 'Load ' + Math.min(batchSize, hiddenCards.length) + ' more stories (' + hiddenCards.length + ' remaining)';
+    }
 
     function revealNextBatch() {
         var toReveal = hiddenCards.splice(0, batchSize);
@@ -187,23 +195,36 @@ function formatDateTime(?int $timestamp): string
         });
 
         if (hiddenCards.length === 0) {
-            observer.disconnect();
-            sentinel.remove();
-            if (status) {
-                status.textContent = 'All validated stories for this run are shown.';
+            if (observer) {
+                observer.disconnect();
             }
+            sentinel.remove();
+            button.remove();
+            if (status) {
+                status.hidden = false;
+            }
+        } else {
+            updateButtonLabel();
         }
     }
 
-    var observer = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-            if (entry.isIntersecting) {
-                revealNextBatch();
-            }
-        });
-    }, { rootMargin: '400px 0px' });
+    button.addEventListener('click', revealNextBatch);
+    updateButtonLabel();
 
-    observer.observe(sentinel);
+    // Auto-reveal on scroll is a bonus on top of the button, not a
+    // replacement — IntersectionObserver support is assumed but the button
+    // above works regardless of whether this fires.
+    var observer = null;
+    if ('IntersectionObserver' in window) {
+        observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    revealNextBatch();
+                }
+            });
+        }, { rootMargin: '400px 0px' });
+        observer.observe(sentinel);
+    }
 })();
 </script>
 </body>
