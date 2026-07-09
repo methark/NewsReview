@@ -31,7 +31,11 @@ return [
         ['name' => 'The Japan Times', 'homepage' => 'https://www.japantimes.co.jp',  'feed' => 'https://www.japantimes.co.jp/feed/'],
         ['name' => 'Straits Times', 'homepage' => 'https://www.straitstimes.com',    'feed' => 'https://www.straitstimes.com/news/world/rss.xml'],
         ['name' => 'Times of India', 'homepage' => 'https://timesofindia.indiatimes.com', 'feed' => 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms'],
-        ['name' => 'Al Arabiya (EN)', 'homepage' => 'https://english.alarabiya.net', 'feed' => 'https://english.alarabiya.net/.mrss/en.xml'],
+        // Al Arabiya (EN) deliberately omitted: its bot detection keeps
+        // returning HTTP 403 even with a standard browser user-agent,
+        // which points to something beyond simple UA filtering (a JS
+        // challenge or TLS fingerprinting) that a plain HTTP client can't
+        // satisfy — not worth the added complexity to chase.
     ],
 
     // Network behaviour: page must render fresh every visit, so keep fetches

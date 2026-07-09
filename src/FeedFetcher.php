@@ -15,6 +15,39 @@ final class FeedFetcher
      */
     public static function fetchAll(array $sources, int $connectTimeout, int $timeout): array
     {
+        $firstPass = self::runBatch($sources, $connectTimeout, $timeout);
+
+        $permanentFailures = array_values(array_filter($firstPass['failures'], static fn (array $f): bool => !$f['transient']));
+        $transientFailures = array_values(array_filter($firstPass['failures'], static fn (array $f): bool => $f['transient']));
+
+        $articles = $firstPass['articles'];
+        $finalFailures = $permanentFailures;
+
+        // A 2xx status with an empty body (e.g. HTTP 202 "accepted") usually
+        // means a CDN edge was mid-refresh when we hit it, not a real block —
+        // unlike a persistent 403/404, it's often gone on the very next
+        // request. Give those a single immediate retry before giving up;
+        // whatever the retry reports (success or failure) is final.
+        if ($transientFailures !== []) {
+            $retrySources = array_map(static fn (array $f): array => $f['source'], $transientFailures);
+            $retryPass = self::runBatch($retrySources, $connectTimeout, $timeout);
+            array_push($articles, ...$retryPass['articles']);
+            array_push($finalFailures, ...$retryPass['failures']);
+        }
+
+        $failed = array_map(static fn (array $f): string => "{$f['source']['name']} ({$f['reason']})", $finalFailures);
+
+        return ['articles' => $articles, 'failed' => $failed];
+    }
+
+    /**
+     * Runs one parallel fetch+parse pass over the given sources.
+     *
+     * @param array<int, array{name: string, homepage: string, feed: string}> $sources
+     * @return array{articles: array<int, array<string, mixed>>, failures: array<int, array{source: array{name: string, homepage: string, feed: string}, reason: string, transient: bool}>}
+     */
+    private static function runBatch(array $sources, int $connectTimeout, int $timeout): array
+    {
         $multiHandle = curl_multi_init();
 
         // Cap how many transfers run concurrently. Firing every configured
@@ -58,7 +91,7 @@ final class FeedFetcher
         } while ($running > 0 && $status === CURLM_OK);
 
         $articles = [];
-        $failed = [];
+        $failures = [];
 
         foreach ($handles as $entry) {
             $ch = $entry['handle'];
@@ -68,12 +101,13 @@ final class FeedFetcher
             $body = curl_multi_getcontent($ch);
 
             if ($body === null || $body === '' || $error !== '' || $httpCode >= 400) {
+                $isEmptyBodyWith2xx = $error === '' && $httpCode >= 200 && $httpCode < 300;
                 $reason = match (true) {
                     $error !== '' => $error,
                     $httpCode > 0 => "HTTP {$httpCode}",
                     default => 'connection failed or timed out',
                 };
-                $failed[] = "{$source['name']} ({$reason})";
+                $failures[] = ['source' => $source, 'reason' => $reason, 'transient' => $isEmptyBodyWith2xx];
                 curl_multi_remove_handle($multiHandle, $ch);
                 curl_close($ch);
                 continue;
@@ -81,7 +115,7 @@ final class FeedFetcher
 
             $parsed = self::parseFeed($body, $source);
             if ($parsed === []) {
-                $failed[] = $source['name'] . ' (unparsable feed)';
+                $failures[] = ['source' => $source, 'reason' => 'unparsable feed', 'transient' => false];
             } else {
                 array_push($articles, ...$parsed);
             }
@@ -92,7 +126,7 @@ final class FeedFetcher
 
         curl_multi_close($multiHandle);
 
-        return ['articles' => $articles, 'failed' => $failed];
+        return ['articles' => $articles, 'failures' => $failures];
     }
 
     /**
