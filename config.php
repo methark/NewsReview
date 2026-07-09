@@ -58,6 +58,12 @@ return [
     // this many distinct outlets.
     'min_sources_required' => 3,
 
-    // Cap on how many validated stories to display.
-    'max_stories_shown' => 20,
+    // Cap on how many validated stories to compute/render per run (all are
+    // rendered server-side; the page reveals them progressively as the user
+    // scrolls — see 'stories_per_batch').
+    'max_stories_shown' => 40,
+
+    // How many story cards are visible initially, and how many more are
+    // revealed each time the user scrolls near the bottom of the list.
+    'stories_per_batch' => 10,
 ];
