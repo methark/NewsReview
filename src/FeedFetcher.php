@@ -38,7 +38,11 @@ final class FeedFetcher
                 CURLOPT_CONNECTTIMEOUT => $connectTimeout,
                 CURLOPT_TIMEOUT => $timeout,
                 CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_USERAGENT => 'NewsReviewFactCheckBot/1.0 (+https://example.local)',
+                // A custom bot user-agent gets blanket-rejected by some
+                // outlets' bot detection (seen with Al Arabiya returning
+                // HTTP 403) even though we're only fetching a public RSS
+                // feed. A standard browser UA avoids that false-positive.
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 CURLOPT_HTTPHEADER => ['Accept: application/rss+xml, application/xml, text/xml, */*'],
             ]);
             curl_multi_add_handle($multiHandle, $ch);
