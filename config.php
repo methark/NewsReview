@@ -31,11 +31,24 @@ return [
         ['name' => 'The Japan Times', 'homepage' => 'https://www.japantimes.co.jp',  'feed' => 'https://www.japantimes.co.jp/feed/'],
         ['name' => 'Straits Times', 'homepage' => 'https://www.straitstimes.com',    'feed' => 'https://www.straitstimes.com/news/world/rss.xml'],
         ['name' => 'Times of India', 'homepage' => 'https://timesofindia.indiatimes.com', 'feed' => 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms'],
+        ['name' => 'NBC News',       'homepage' => 'https://www.nbcnews.com',          'feed' => 'https://feeds.nbcnews.com/nbcnews/public/news'],
+        ['name' => 'The Hill',       'homepage' => 'https://thehill.com',              'feed' => 'https://thehill.com/homenews/feed'],
+        ['name' => 'Politico',       'homepage' => 'https://www.politico.com',         'feed' => 'https://www.politico.com/rss/politicopicks.xml'],
+        ['name' => 'The Atlantic',   'homepage' => 'https://www.theatlantic.com',      'feed' => 'https://www.theatlantic.com/feed/all/'],
+        ['name' => 'Business Insider', 'homepage' => 'https://www.businessinsider.com', 'feed' => 'https://www.businessinsider.com/rss'],
+        ['name' => 'South China Morning Post', 'homepage' => 'https://www.scmp.com',   'feed' => 'https://www.scmp.com/rss/91/feed'],
+        ['name' => 'The Times of Israel', 'homepage' => 'https://www.timesofisrael.com', 'feed' => 'https://www.timesofisrael.com/feed/'],
         // Al Arabiya (EN) deliberately omitted: its bot detection keeps
         // returning HTTP 403 even with a standard browser user-agent,
         // which points to something beyond simple UA filtering (a JS
         // challenge or TLS fingerprinting) that a plain HTTP client can't
         // satisfy — not worth the added complexity to chase.
+        //
+        // The newly added feeds above haven't been live-verified from this
+        // dev environment (its network policy blocks outbound requests to
+        // arbitrary news domains) — if any show up under "Unreachable this
+        // run" consistently, treat that the same as Reuters/USA Today
+        // earlier: check the URL still exists, or just remove the entry.
     ],
 
     // Network behaviour: page must render fresh every visit, so keep fetches
@@ -48,6 +61,12 @@ return [
     // Only consider articles published within this window, so "today's" cross-checks
     // aren't polluted by an old story resurfacing on one outlet.
     'max_article_age_hours' => 48,
+
+    // When a search query is active, look back further than the default
+    // dashboard window — a deliberate search should be able to reach a
+    // slightly older story that outlets have moved off their front page,
+    // not just what's freshest right now.
+    'search_max_article_age_hours' => 168,
 
     // Clustering: minimum blended token-overlap score (Jaccard + overlap
     // coefficient, averaged) for two articles from different outlets to be

@@ -37,10 +37,12 @@ $candidateArticles = $searchQuery !== ''
     ? ArticleSearch::filter($fetchResult['articles'], $searchQuery)
     : $fetchResult['articles'];
 
+$ageWindowHours = $searchQuery !== '' ? $config['search_max_article_age_hours'] : $config['max_article_age_hours'];
+
 $rawClusters = StoryClusterer::cluster(
     $candidateArticles,
     $config['similarity_threshold'],
-    $config['max_article_age_hours']
+    $ageWindowHours
 );
 
 $stories = [];
@@ -67,6 +69,36 @@ function formatDateTime(?int $timestamp): string
         return 'Date unknown';
     }
     return gmdate('D, d M Y H:i', $timestamp) . ' UTC';
+}
+
+/**
+ * Escapes $text for HTML, then wraps case-insensitive matches of the
+ * search query's terms in <mark>. Operates on already-escaped text and
+ * only ever inserts a fixed, attribute-free tag, so it can't reintroduce
+ * markup from user input.
+ */
+function highlightQuery(string $text, string $query): string
+{
+    $escaped = h($text);
+    if ($query === '') {
+        return $escaped;
+    }
+
+    $terms = TextUtils::tokenize($query);
+    if ($terms === []) {
+        $terms = [mb_strtolower($query)];
+    }
+
+    $patterns = array_map(
+        static fn (string $term): string => '/' . preg_quote(h($term), '/') . '/iu',
+        array_filter($terms, static fn (string $t): bool => $t !== '')
+    );
+
+    if ($patterns === []) {
+        return $escaped;
+    }
+
+    return preg_replace($patterns, '<mark>$0</mark>', $escaped) ?? $escaped;
 }
 ?>
 <!DOCTYPE html>
@@ -112,7 +144,7 @@ function formatDateTime(?int $timestamp): string
         <p>No stories matching &ldquo;<?= h($searchQuery) ?>&rdquo; cleared cross-validation on this run. Search only covers articles fetched just now, not a historical archive, so a narrow search term can easily fall under the <?= (int) $config['min_sources_required'] ?>-source bar even if the story itself is real.</p>
         <p><a href="?">Clear the search</a> to see all validated stories, or try a broader term.</p>
         <?php else: ?>
-        <p>No stories cleared cross-validation on this run. This can happen if too few source feeds were reachable, or if no story was independently confirmed by <?= (int) $config['min_sources_required'] ?>+ outlets in the last <?= (int) $config['max_article_age_hours'] ?> hours.</p>
+        <p>No stories cleared cross-validation on this run. This can happen if too few source feeds were reachable, or if no story was independently confirmed by <?= (int) $config['min_sources_required'] ?>+ outlets in the last <?= (int) $ageWindowHours ?> hours.</p>
         <p>Reload the page to run the check again.</p>
         <?php endif; ?>
     </div>
@@ -120,14 +152,14 @@ function formatDateTime(?int $timestamp): string
 
     <?php foreach ($stories as $storyIndex => $story): ?>
     <article class="story-card" data-story-index="<?= (int) $storyIndex ?>" <?= $storyIndex >= $config['stories_per_batch'] ? 'hidden' : '' ?>>
-        <h2 class="story-title"><?= h($story['title']) ?></h2>
+        <h2 class="story-title"><?= highlightQuery($story['title'], $searchQuery) ?></h2>
         <p class="story-datetime"><?= h(formatDateTime($story['published_at'])) ?></p>
 
         <section class="story-section">
             <h3>The Filtered Article</h3>
             <ul class="filtered-article">
                 <?php foreach ($story['filtered_facts'] as $fact): ?>
-                <li><?= h($fact) ?></li>
+                <li><?= highlightQuery($fact, $searchQuery) ?></li>
                 <?php endforeach; ?>
             </ul>
         </section>

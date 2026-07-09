@@ -61,6 +61,45 @@ final class TextUtils
     }
 
     /**
+     * Extracts probable proper-noun phrases (people, places, organizations)
+     * from a headline: runs of consecutive capitalized words. Deliberately
+     * naive — no real NER, and headlines routinely lead with their subject
+     * ("Musk unveils...", "Ukraine strikes...") so the first word isn't
+     * skipped — but headlines about the same story usually repeat the same
+     * names even when everything else about the wording differs. Callers
+     * guard against false positives from a single generic capitalized word
+     * by requiring multiple shared phrases, not just one.
+     *
+     * @return string[] lowercased, deduplicated phrases
+     */
+    public static function extractEntityPhrases(string $title): array
+    {
+        $words = preg_split('/\s+/u', trim(self::stripHtml($title))) ?: [];
+        $phrases = [];
+        $current = [];
+
+        foreach ($words as $word) {
+            $clean = preg_replace('/[^\p{L}\p{N}]/u', '', $word) ?? '';
+            $isCapitalized = $clean !== '' && preg_match('/^\p{Lu}/u', $clean) === 1;
+
+            if (!$isCapitalized || mb_strlen($clean) < 2) {
+                if ($current !== []) {
+                    $phrases[] = mb_strtolower(implode(' ', $current));
+                    $current = [];
+                }
+                continue;
+            }
+
+            $current[] = $clean;
+        }
+        if ($current !== []) {
+            $phrases[] = mb_strtolower(implode(' ', $current));
+        }
+
+        return array_values(array_unique(array_filter($phrases, static fn (string $p): bool => mb_strlen($p) >= 3)));
+    }
+
+    /**
      * Jaccard similarity between two token sets (0..1). Sensitive to size
      * mismatches between the two sets — a short and a long text describing
      * the same thing score low even with full subset overlap, because the
@@ -114,6 +153,25 @@ final class TextUtils
     public static function sharedTokenCount(array $a, array $b): int
     {
         return count(array_intersect(array_unique($a), array_unique($b)));
+    }
+
+    /**
+     * True if two entity-phrase sets (see extractEntityPhrases) share at
+     * least one specific multi-word name — an org or full person name is
+     * unambiguous enough on its own to identify the same story, with no
+     * need for any other corroborating signal.
+     *
+     * @param string[] $a
+     * @param string[] $b
+     */
+    public static function hasSharedMultiWordEntity(array $a, array $b): bool
+    {
+        foreach (array_intersect(array_unique($a), array_unique($b)) as $phrase) {
+            if (str_contains($phrase, ' ')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

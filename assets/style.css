@@ -19,7 +19,21 @@
         --accent: #6fa8ff;
         --warning-bg: #332900;
         --warning-text: #e0bd5f;
+        --mark-bg: #5a4a00;
+        --mark-text: #ffe28a;
     }
+}
+
+:root {
+    --mark-bg: #fff2a8;
+    --mark-text: #1a1d23;
+}
+
+mark {
+    background: var(--mark-bg);
+    color: var(--mark-text);
+    border-radius: 3px;
+    padding: 0 0.15em;
 }
 
 * { box-sizing: border-box; }

@@ -27,6 +27,7 @@ final class StoryClusterer
                 continue;
             }
             $article['tokens'] = TextUtils::tokenize($article['title'] . ' ' . $article['description']);
+            $article['entities'] = TextUtils::extractEntityPhrases($article['title']);
             $items[] = $article;
         }
 
@@ -66,7 +67,23 @@ final class StoryClusterer
                 $overlap = TextUtils::overlapCoefficient($tokensA, $tokensB);
                 $similarity = ($jaccard + $overlap) / 2;
 
-                if ($similarity >= $similarityThreshold && TextUtils::sharedTokenCount($tokensA, $tokensB) >= 4) {
+                $isTokenMatch = $similarity >= $similarityThreshold && TextUtils::sharedTokenCount($tokensA, $tokensB) >= 4;
+
+                // Two headlines can describe the same story in almost
+                // unrelated wording ("Fed raises rates" vs "Central bank
+                // lifts benchmark") while still sharing the names that
+                // actually identify it. A shared multi-word name (a full
+                // org/person name) is specific enough to stand on its own;
+                // a shared single-word name is weaker and coincidental
+                // enough (two unrelated stories both mentioning "Biden")
+                // that it also needs at least two of them, plus some
+                // topical relevance floor, before counting as a match.
+                $entitiesA = $items[$i]['entities'];
+                $entitiesB = $items[$j]['entities'];
+                $isEntityMatch = TextUtils::hasSharedMultiWordEntity($entitiesA, $entitiesB)
+                    || (TextUtils::sharedTokenCount($entitiesA, $entitiesB) >= 2 && $similarity >= ($similarityThreshold * 0.5));
+
+                if ($isTokenMatch || $isEntityMatch) {
                     $union($i, $j);
                 }
             }
