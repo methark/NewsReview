@@ -83,7 +83,17 @@ final class FeedFetcher
     private static function parseFeed(string $body, array $source): array
     {
         $previous = libxml_use_internal_errors(true);
-        $xml = simplexml_load_string($body);
+
+        // Real-world feeds are frequently not quite well-formed (unescaped
+        // "&", stray control characters, mismatched encoding declarations).
+        // Try a strict parse first, then fall back to libxml's recovery mode
+        // rather than discarding the whole feed over a minor validity issue.
+        $xml = simplexml_load_string($body, \SimpleXMLElement::class, LIBXML_NOCDATA);
+        if ($xml === false) {
+            $xml = simplexml_load_string($body, \SimpleXMLElement::class, LIBXML_NOCDATA | LIBXML_RECOVER | LIBXML_PARSEHUGE);
+        }
+
+        libxml_clear_errors();
         libxml_use_internal_errors($previous);
 
         if ($xml === false) {
