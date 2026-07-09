@@ -53,8 +53,20 @@ final class StoryClusterer
                 if ($items[$i]['source_name'] === $items[$j]['source_name']) {
                     continue; // similarity across the *same* outlet isn't cross-validation
                 }
-                $similarity = TextUtils::jaccard($items[$i]['tokens'], $items[$j]['tokens']);
-                if ($similarity >= $similarityThreshold) {
+                $tokensA = $items[$i]['tokens'];
+                $tokensB = $items[$j]['tokens'];
+
+                // Outlets vary hugely in how long their RSS descriptions are
+                // (one-line teaser vs full paragraph). Jaccard alone punishes
+                // that mismatch even when one text is fully contained in the
+                // other, so blend it with the overlap coefficient (normalized
+                // by the smaller set) and require a minimum absolute overlap
+                // so two very short, coincidentally-similar texts can't match.
+                $jaccard = TextUtils::jaccard($tokensA, $tokensB);
+                $overlap = TextUtils::overlapCoefficient($tokensA, $tokensB);
+                $similarity = ($jaccard + $overlap) / 2;
+
+                if ($similarity >= $similarityThreshold && TextUtils::sharedTokenCount($tokensA, $tokensB) >= 4) {
                     $union($i, $j);
                 }
             }

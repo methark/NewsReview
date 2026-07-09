@@ -61,7 +61,10 @@ final class TextUtils
     }
 
     /**
-     * Jaccard similarity between two token sets (0..1).
+     * Jaccard similarity between two token sets (0..1). Sensitive to size
+     * mismatches between the two sets — a short and a long text describing
+     * the same thing score low even with full subset overlap, because the
+     * union (denominator) is dominated by the longer text's extra tokens.
      *
      * @param string[] $a
      * @param string[] $b
@@ -76,6 +79,41 @@ final class TextUtils
         $intersection = count(array_intersect($setA, $setB));
         $union = count(array_unique(array_merge($setA, $setB)));
         return $union > 0 ? $intersection / $union : 0.0;
+    }
+
+    /**
+     * Overlap coefficient between two token sets (0..1): intersection size
+     * divided by the *smaller* set's size, rather than the union. Unlike
+     * Jaccard, this doesn't get crushed when one text (e.g. a wire agency's
+     * one-line teaser) is much shorter than another (e.g. a full paragraph
+     * summary) describing the same story.
+     *
+     * @param string[] $a
+     * @param string[] $b
+     */
+    public static function overlapCoefficient(array $a, array $b): float
+    {
+        if ($a === [] || $b === []) {
+            return 0.0;
+        }
+        $setA = array_unique($a);
+        $setB = array_unique($b);
+        $intersection = count(array_intersect($setA, $setB));
+        $smaller = min(count($setA), count($setB));
+        return $smaller > 0 ? $intersection / $smaller : 0.0;
+    }
+
+    /**
+     * Count of distinct tokens shared between two token sets. Used as a
+     * floor alongside similarity ratios so that two very short texts can't
+     * be judged "the same story" purely because they overlap proportionally.
+     *
+     * @param string[] $a
+     * @param string[] $b
+     */
+    public static function sharedTokenCount(array $a, array $b): int
+    {
+        return count(array_intersect(array_unique($a), array_unique($b)));
     }
 
     /**
