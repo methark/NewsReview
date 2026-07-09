@@ -5,16 +5,21 @@ declare(strict_types=1);
 /**
  * Fact-checked news dashboard.
  *
- * On every visit: fetches live from several independent outlets, clusters
- * articles that report the same story, keeps only stories confirmed by
- * min_sources_required distinct outlets, strips biased/opinion language,
- * and renders the result. No caching — this pipeline runs fresh each time
- * the page loads, per requirement.
+ * The expensive step — live-fetching 30-40 outlets — is cached to a local
+ * JSON file for up to cache_ttl_seconds (see StoryCache), since running
+ * that fetch on every single page visit was hitting real-world timeouts
+ * under normal network conditions and made every visit (including a
+ * search or a category-checkbox change, neither of which needs a fresh
+ * fetch) pay that cost. Category filtering, search, clustering, and
+ * fact-checking still run fresh on every request against whichever pool
+ * — cached or freshly fetched — is available; see refresh.php to force
+ * or schedule a fetch independent of any page visit.
  */
 
 require __DIR__ . '/src/TextUtils.php';
 require __DIR__ . '/src/TopicFilter.php';
 require __DIR__ . '/src/FeedFetcher.php';
+require __DIR__ . '/src/StoryCache.php';
 require __DIR__ . '/src/ArticleSearch.php';
 require __DIR__ . '/src/StoryClusterer.php';
 require __DIR__ . '/src/FactChecker.php';
@@ -52,15 +57,38 @@ $filteredSources = array_values(array_filter(
     static fn (array $source): bool => in_array($source['category'], $selectedCategories, true)
 ));
 
-$fetchResult = FeedFetcher::fetchAll(
-    $filteredSources,
-    $config['fetch_connect_timeout_seconds'],
-    $config['fetch_timeout_seconds']
-);
+// The cache holds ALL sources' articles (every category), fetched together
+// in one pass, so it can serve any category combination a visitor picks
+// without needing a separate cache per combination.
+$cached = $config['cache_enabled'] ? StoryCache::read($config['cache_file'], $config['cache_ttl_seconds']) : null;
+$usedCache = $cached !== null;
+
+if ($usedCache) {
+    $allArticles = $cached['articles'];
+    $failedSources = $cached['failed'];
+    $fetchedAt = $cached['fetched_at'];
+} else {
+    $fetchResult = FeedFetcher::fetchAll(
+        $config['sources'],
+        $config['fetch_connect_timeout_seconds'],
+        $config['fetch_timeout_seconds']
+    );
+    $allArticles = $fetchResult['articles'];
+    $failedSources = $fetchResult['failed'];
+    $fetchedAt = time();
+    if ($config['cache_enabled']) {
+        StoryCache::write($config['cache_file'], $allArticles, $failedSources, $fetchedAt);
+    }
+}
+
+$categoryArticles = array_values(array_filter(
+    $allArticles,
+    static fn (array $article): bool => in_array($article['source_category'], $selectedCategories, true)
+));
 
 $candidateArticles = $searchQuery !== ''
-    ? ArticleSearch::filter($fetchResult['articles'], $searchQuery)
-    : $fetchResult['articles'];
+    ? ArticleSearch::filter($categoryArticles, $searchQuery)
+    : $categoryArticles;
 
 $ageWindowHours = $searchQuery !== '' ? $config['search_max_article_age_hours'] : $config['max_article_age_hours'];
 
@@ -94,6 +122,18 @@ function formatDateTime(?int $timestamp): string
         return 'Date unknown';
     }
     return gmdate('D, d M Y H:i', $timestamp) . ' UTC';
+}
+
+function formatMinutesAgo(int $timestamp): string
+{
+    $minutes = (int) round((time() - $timestamp) / 60);
+    if ($minutes <= 0) {
+        return 'less than a minute ago';
+    }
+    if ($minutes === 1) {
+        return '1 minute ago';
+    }
+    return "{$minutes} minutes ago";
 }
 
 /**
@@ -161,7 +201,8 @@ function highlightQuery(string $text, string $query): string
         </form>
 
         <p class="run-meta">
-            Checked just now &middot; <?= count($fetchResult['articles']) ?> articles scanned across <?= count($filteredSources) ?> outlets
+            <?= $usedCache ? 'Data refreshed ' . h(formatMinutesAgo($fetchedAt)) : 'Checked just now' ?>
+            &middot; <?= count($categoryArticles) ?> articles scanned across <?= count($filteredSources) ?> outlets
             <?php if ($selectedCategories !== $validCategories): ?>
             (<?= h(implode(', ', array_map('ucfirst', $selectedCategories)) ?: 'none selected') ?>)
             <?php endif; ?>
@@ -170,8 +211,8 @@ function highlightQuery(string $text, string $query): string
             <?php endif; ?>
             &middot; <?= count($stories) ?> stories passed validation &middot; generated in <?= number_format($runDuration, 2) ?>s
         </p>
-        <?php if ($fetchResult['failed'] !== []): ?>
-        <p class="fetch-warning">Unreachable this run: <?= h(implode(', ', $fetchResult['failed'])) ?></p>
+        <?php if ($failedSources !== []): ?>
+        <p class="fetch-warning"><?= $usedCache ? 'Unreachable at last refresh' : 'Unreachable this run' ?> (all categories): <?= h(implode(', ', $failedSources)) ?></p>
         <?php endif; ?>
     </div>
 </header>
@@ -182,11 +223,11 @@ function highlightQuery(string $text, string $query): string
         <?php if ($selectedCategories === []): ?>
         <p>No category is selected, so there's nothing to fetch. Check at least one of World, Science, or Finance above.</p>
         <?php elseif ($searchQuery !== ''): ?>
-        <p>No stories matching &ldquo;<?= h($searchQuery) ?>&rdquo; cleared cross-validation on this run. Search only covers articles fetched just now, not a historical archive, so a narrow search term can easily fall under the <?= (int) $config['min_sources_required'] ?>-source bar even if the story itself is real.</p>
+        <p>No stories matching &ldquo;<?= h($searchQuery) ?>&rdquo; cleared cross-validation. Search only covers <?= $usedCache ? 'the currently cached articles' : 'articles fetched just now' ?>, not a full historical archive, so a narrow search term can easily fall under the <?= (int) $config['min_sources_required'] ?>-source bar even if the story itself is real.</p>
         <p><a href="?">Clear the search</a> to see all validated stories, or try a broader term.</p>
         <?php else: ?>
-        <p>No stories cleared cross-validation on this run. This can happen if too few source feeds were reachable, or if no story was independently confirmed by <?= (int) $config['min_sources_required'] ?>+ outlets in the last <?= (int) $ageWindowHours ?> hours.</p>
-        <p>Reload the page to run the check again.</p>
+        <p>No stories cleared cross-validation. This can happen if too few source feeds were reachable, or if no story was independently confirmed by <?= (int) $config['min_sources_required'] ?>+ outlets in the last <?= (int) $ageWindowHours ?> hours.</p>
+        <p>Reload the page to run the check again<?= $usedCache ? ', or wait for the next scheduled refresh' : '' ?>.</p>
         <?php endif; ?>
     </div>
     <?php endif; ?>
@@ -240,8 +281,12 @@ function highlightQuery(string $text, string $query): string
 </main>
 
 <footer class="site-footer">
-    <p>Sources polled this run: <?= h(implode(', ', array_column($filteredSources, 'name')) ?: 'none') ?></p>
+    <p>Sources considered this run: <?= h(implode(', ', array_column($filteredSources, 'name')) ?: 'none') ?></p>
+    <?php if ($config['cache_enabled']): ?>
+    <p>Cross-checking, filtering, and search run fresh on every visit; the underlying article fetch across all outlets is cached for up to <?= (int) round($config['cache_ttl_seconds'] / 60) ?> minutes so a search or category change doesn't re-trigger a live fetch of 30+ outlets. See <code>refresh.php</code> to force or schedule a refresh independent of any page visit.</p>
+    <?php else: ?>
     <p>This page re-runs the entire fetch-and-verify pipeline on every visit — nothing is cached or stored.</p>
+    <?php endif; ?>
 </footer>
 
 <script>

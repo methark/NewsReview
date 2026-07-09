@@ -77,12 +77,25 @@ return [
     // selection at all (a fresh visit, not a filtered one).
     'default_categories' => ['world', 'science', 'finance'],
 
-    // Network behaviour: page must render fresh every visit, so keep fetches
-    // reasonably short. Connections are capped at 6 concurrent (see
-    // FeedFetcher), so with 40 sources most feeds queue behind others and
-    // don't even start until an earlier one finishes — give real (if slow)
-    // connections enough room to complete once their turn comes, rather
-    // than timing out just from being queued behind 30+ other sources.
+    // Cache the raw fetch across all 30-40 outlets for this long, so a
+    // page visit — including a search or category-checkbox change, which
+    // don't need a fresh network fetch — reads from disk instead of
+    // re-triggering a live fetch every time. Clustering, filtering, and
+    // fact-checking still run fresh on every request against whichever
+    // pool (cached or freshly fetched) is available; only the network
+    // fetch itself is cached. Set cache_enabled to false to go back to a
+    // live fetch on every single visit. See refresh.php to force or
+    // schedule a refresh independent of any page visit.
+    'cache_enabled' => true,
+    'cache_ttl_seconds' => 3600,
+    'cache_file' => __DIR__ . '/cache/stories.json',
+
+    // Network behaviour for an actual fetch (cache miss, or refresh.php).
+    // Connections are capped at 6 concurrent (see FeedFetcher), so with 40
+    // sources most feeds queue behind others and don't even start until an
+    // earlier one finishes — give real (if slow) connections enough room
+    // to complete once their turn comes, rather than timing out just from
+    // being queued behind 30+ other sources.
     'fetch_timeout_seconds'       => 15,
     'fetch_connect_timeout_seconds' => 8,
 

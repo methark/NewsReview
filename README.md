@@ -12,20 +12,27 @@ with:
 - **Considerations** — confidence level, discrepancies between sources, what was filtered out
 - **Resources** — the outlets used to cross-check the story, with links
 
-There is no caching or storage: the whole fetch → cross-check → filter
-pipeline runs fresh on each request, straight from `index.php`.
+Cross-checking, filtering, and search run fresh on every request. The
+underlying live fetch across 30-40 outlets is the one expensive step, so
+it's cached to a local file for up to an hour (`cache_ttl_seconds`) rather
+than re-run on every single page visit — a search or a category-checkbox
+change reads from that cache instead of re-fetching everything live. Set
+`cache_enabled` to `false` in `config.php` to go back to a live fetch on
+every visit. Run `refresh.php` (CLI, browser, or a scheduled task — see
+that file for a Windows Task Scheduler example) to force or schedule a
+refresh independent of any page visit, so the cache stays warm and no
+visitor has to wait through a live fetch themselves.
 
-A search box at the top filters *this run's* fetched articles by query
-before clustering runs, so results still go through the same 3-source
-validation — there's no historical archive to search, only whatever was
-fetched live just now (searching looks back further than the default
-dashboard view, since a deliberate search should reach slightly older
-stories outlets have moved off their front page — see
-`search_max_article_age_hours`). Matched terms are highlighted in
-results. Only the first 10 validated stories are shown initially; a
-"Load more" button (and auto-reveal on scroll) shows more — already
-computed server-side, just progressively unhidden — so re-running the
-live fetch isn't needed to page through results.
+A search box at the top filters the current article pool (cached or
+freshly fetched) by query before clustering runs, so results still go
+through the same 3-source validation — there's no historical archive to
+search beyond whatever's currently cached (searching looks back further
+than the default dashboard view within that pool, since a deliberate
+search should reach slightly older stories outlets have moved off their
+front page — see `search_max_article_age_hours`). Matched terms are
+highlighted in results. Only the first 10 validated stories are shown
+initially; a "Load more" button (and auto-reveal on scroll) shows more —
+already computed server-side, just progressively unhidden.
 
 Cross-checking isn't limited to headlines using near-identical wording:
 articles are also matched when they share a specific proper-noun phrase
@@ -62,8 +69,9 @@ Edit `config.php` to change the source outlets (each tagged with a
 `category` of `world`, `science`, or `finance`), the minimum number of
 outlets required to validate a story, the clustering similarity
 threshold, the article age window, how many validated stories are
-computed per run (`max_stories_shown`), or how many are shown per
-scroll batch (`stories_per_batch`).
+computed per run (`max_stories_shown`), how many are shown per scroll
+batch (`stories_per_batch`), or the cache behavior
+(`cache_enabled`, `cache_ttl_seconds`, `cache_file`).
 
 ## How it works
 
@@ -86,6 +94,11 @@ scroll batch (`stories_per_batch`).
 - `src/TopicFilter.php` — keyword-based exclusion of sports and
   celebrity/gossip content, applied to every fetched article regardless
   of which feed it came from.
+- `src/StoryCache.php` — reads/writes the cached article pool that
+  `index.php` uses when it's fresh, and `refresh.php` writes to on a
+  forced or scheduled run.
+- `refresh.php` — standalone script that fetches every configured
+  source and writes the cache, independent of any page visit.
 
 Speculative or question-framed articles (`TextUtils::isSpeculative`) are
 rejected entirely at the fetch stage in `FeedFetcher`, so they never

@@ -10,7 +10,7 @@ declare(strict_types=1);
 final class FeedFetcher
 {
     /**
-     * @param array<int, array{name: string, homepage: string, feed: string}> $sources
+     * @param array<int, array{name: string, homepage: string, feed: string, category: string}> $sources
      * @return array{articles: array<int, array<string, mixed>>, failed: string[]}
      */
     public static function fetchAll(array $sources, int $connectTimeout, int $timeout): array
@@ -43,8 +43,8 @@ final class FeedFetcher
     /**
      * Runs one parallel fetch+parse pass over the given sources.
      *
-     * @param array<int, array{name: string, homepage: string, feed: string}> $sources
-     * @return array{articles: array<int, array<string, mixed>>, failures: array<int, array{source: array{name: string, homepage: string, feed: string}, reason: string, transient: bool}>}
+     * @param array<int, array{name: string, homepage: string, feed: string, category: string}> $sources
+     * @return array{articles: array<int, array<string, mixed>>, failures: array<int, array{source: array{name: string, homepage: string, feed: string, category: string}, reason: string, transient: bool}>}
      */
     private static function runBatch(array $sources, int $connectTimeout, int $timeout): array
     {
@@ -149,7 +149,7 @@ final class FeedFetcher
     }
 
     /**
-     * @param array{name: string, homepage: string, feed: string} $source
+     * @param array{name: string, homepage: string, feed: string, category: string} $source
      * @return array{xmlParsed: bool, items: array<int, array<string, mixed>>}
      */
     private static function parseFeed(string $body, array $source): array
@@ -234,7 +234,7 @@ final class FeedFetcher
     }
 
     /**
-     * @param array{name: string, homepage: string, feed: string} $source
+     * @param array{name: string, homepage: string, feed: string, category: string} $source
      * @return array<string, mixed>|null
      */
     private static function normalizeRssItem(\SimpleXMLElement $item, array $source): ?array
@@ -257,6 +257,7 @@ final class FeedFetcher
             'description' => $description,
             'source_name' => $source['name'],
             'source_homepage' => $source['homepage'],
+            'source_category' => $source['category'],
             'published_at' => $timestamp !== false ? $timestamp : null,
         ];
     }
@@ -273,7 +274,7 @@ final class FeedFetcher
     }
 
     /**
-     * @param array{name: string, homepage: string, feed: string} $source
+     * @param array{name: string, homepage: string, feed: string, category: string} $source
      * @return array<string, mixed>|null
      */
     private static function normalizeAtomEntry(\SimpleXMLElement $entry, array $source): ?array
@@ -304,6 +305,7 @@ final class FeedFetcher
             'description' => $description,
             'source_name' => $source['name'],
             'source_homepage' => $source['homepage'],
+            'source_category' => $source['category'],
             'published_at' => $timestamp !== false ? $timestamp : null,
         ];
     }
