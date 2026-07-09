@@ -85,33 +85,45 @@ final class FeedFetcher
         $running = null;
         do {
             $status = curl_multi_exec($multiHandle, $running);
-            if ($running > 0) {
-                curl_multi_select($multiHandle, 1.0);
+        } while ($status === CURLM_CALL_MULTI_PERFORM);
+
+        while ($running > 0 && $status === CURLM_OK) {
+            if (curl_multi_select($multiHandle, 1.0) === -1) {
+                usleep(10_000);
             }
-        } while ($running > 0 && $status === CURLM_OK);
+            do {
+                $status = curl_multi_exec($multiHandle, $running);
+            } while ($status === CURLM_CALL_MULTI_PERFORM);
+        }
+
+        // curl_multi_info_read() returns the authoritative per-transfer
+        // CURLcode straight from libcurl. Reading curl_error()/curl_errno()
+        // on a handle after the batch finishes isn't reliable on every
+        // platform — on one Windows/XAMPP setup both came back empty (no
+        // text, code 0) for a batch of connections that were all genuinely
+        // failing, which made every failure report as a bare, undiagnosable
+        // "timed out" regardless of the real cause.
+        $curlResults = [];
+        while (($info = curl_multi_info_read($multiHandle)) !== false) {
+            $curlResults[(int) $info['handle']] = (int) $info['result'];
+        }
 
         $articles = [];
         $failures = [];
 
-        foreach ($handles as $entry) {
+        foreach ($handles as $id => $entry) {
             $ch = $entry['handle'];
             $source = $entry['source'];
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            $errno = curl_errno($ch);
             $body = curl_multi_getcontent($ch);
+            $curlResult = $curlResults[$id] ?? null;
+            $hasCurlError = $curlResult !== null && $curlResult !== CURLE_OK;
 
-            if ($body === null || $body === '' || $error !== '' || $httpCode >= 400) {
-                $isEmptyBodyWith2xx = $error === '' && $httpCode >= 200 && $httpCode < 300;
+            if ($body === null || $body === '' || $hasCurlError || $httpCode >= 400) {
+                $isEmptyBodyWith2xx = !$hasCurlError && $httpCode >= 200 && $httpCode < 300;
                 $reason = match (true) {
-                    $error !== '' => $error,
+                    $hasCurlError => (curl_strerror($curlResult) ?? 'unknown error') . " (curl error {$curlResult})",
                     $httpCode > 0 => "HTTP {$httpCode}",
-                    // curl_error() text is sometimes empty on Windows even
-                    // when curl_errno() has a real code (seen with the
-                    // Schannel SSL backend some XAMPP/Windows PHP builds
-                    // use) — surface the numeric code so a recurring failure
-                    // is diagnosable instead of a bare "timed out".
-                    $errno !== 0 => "connection failed, curl error {$errno}",
                     default => 'connection failed or timed out',
                 };
                 $failures[] = ['source' => $source, 'reason' => $reason, 'transient' => $isEmptyBodyWith2xx];
