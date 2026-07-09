@@ -19,6 +19,14 @@ require __DIR__ . '/src/ArticleSearch.php';
 require __DIR__ . '/src/StoryClusterer.php';
 require __DIR__ . '/src/FactChecker.php';
 
+// Worst case, a full run fetches (source count / 6 concurrent connections)
+// batches, each bounded by fetch_timeout_seconds — with 40 sources that's
+// up to ~100s. PHP's default max_execution_time (often 30s) would silently
+// kill the script mid-fetch before curl's own timeouts ever get a chance
+// to resolve things cleanly. This only stretches the ceiling; a normal run
+// where most feeds respond quickly finishes in a couple of seconds either way.
+set_time_limit(120);
+
 $config = require __DIR__ . '/config.php';
 
 $runStart = microtime(true);

@@ -79,10 +79,12 @@ return [
 
     // Network behaviour: page must render fresh every visit, so keep fetches
     // reasonably short. Connections are capped at 6 concurrent (see
-    // FeedFetcher), so with 20+ sources some feeds queue behind others —
-    // give slightly more headroom than a single-burst fetch would need.
-    'fetch_timeout_seconds'       => 10,
-    'fetch_connect_timeout_seconds' => 6,
+    // FeedFetcher), so with 40 sources most feeds queue behind others and
+    // don't even start until an earlier one finishes — give real (if slow)
+    // connections enough room to complete once their turn comes, rather
+    // than timing out just from being queued behind 30+ other sources.
+    'fetch_timeout_seconds'       => 15,
+    'fetch_connect_timeout_seconds' => 8,
 
     // Only consider articles published within this window, so "today's" cross-checks
     // aren't polluted by an old story resurfacing on one outlet.
