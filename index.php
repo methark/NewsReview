@@ -13,6 +13,7 @@ declare(strict_types=1);
  */
 
 require __DIR__ . '/src/TextUtils.php';
+require __DIR__ . '/src/TopicFilter.php';
 require __DIR__ . '/src/FeedFetcher.php';
 require __DIR__ . '/src/ArticleSearch.php';
 require __DIR__ . '/src/StoryClusterer.php';
@@ -27,8 +28,24 @@ $runStart = microtime(true);
 $searchQuery = trim((string) ($_GET['q'] ?? ''));
 $searchQuery = mb_substr($searchQuery, 0, 120);
 
-$fetchResult = FeedFetcher::fetchAll(
+// Category checkboxes: unchecked boxes simply aren't submitted by HTML
+// forms, so an empty $_GET['cat'] is indistinguishable from "no filter
+// touched yet" unless a fresh page load (no 'filtered' marker) is told
+// apart from a real submission where the user unchecked everything.
+$validCategories = ['world', 'science', 'finance'];
+if (isset($_GET['filtered'])) {
+    $selectedCategories = array_values(array_intersect((array) ($_GET['cat'] ?? []), $validCategories));
+} else {
+    $selectedCategories = $config['default_categories'];
+}
+
+$filteredSources = array_values(array_filter(
     $config['sources'],
+    static fn (array $source): bool => in_array($source['category'], $selectedCategories, true)
+));
+
+$fetchResult = FeedFetcher::fetchAll(
+    $filteredSources,
     $config['fetch_connect_timeout_seconds'],
     $config['fetch_timeout_seconds']
 );
@@ -122,10 +139,24 @@ function highlightQuery(string $text, string $query): string
             <?php if ($searchQuery !== ''): ?>
             <a class="clear-search" href="?">Clear</a>
             <?php endif; ?>
+
+            <input type="hidden" name="filtered" value="1">
+            <fieldset class="category-filter">
+                <legend class="sr-only">Filter by category</legend>
+                <?php foreach ($validCategories as $category): ?>
+                <label class="category-checkbox">
+                    <input type="checkbox" name="cat[]" value="<?= h($category) ?>" <?= in_array($category, $selectedCategories, true) ? 'checked' : '' ?>>
+                    <?= h(ucfirst($category)) ?>
+                </label>
+                <?php endforeach; ?>
+            </fieldset>
         </form>
 
         <p class="run-meta">
-            Checked just now &middot; <?= count($fetchResult['articles']) ?> articles scanned across <?= count($config['sources']) ?> outlets
+            Checked just now &middot; <?= count($fetchResult['articles']) ?> articles scanned across <?= count($filteredSources) ?> outlets
+            <?php if ($selectedCategories !== $validCategories): ?>
+            (<?= h(implode(', ', array_map('ucfirst', $selectedCategories)) ?: 'none selected') ?>)
+            <?php endif; ?>
             <?php if ($searchQuery !== ''): ?>
             &middot; <?= count($candidateArticles) ?> match &ldquo;<?= h($searchQuery) ?>&rdquo;
             <?php endif; ?>
@@ -140,7 +171,9 @@ function highlightQuery(string $text, string $query): string
 <main class="story-list" id="storyList" data-batch-size="<?= (int) $config['stories_per_batch'] ?>">
     <?php if ($stories === []): ?>
     <div class="empty-state">
-        <?php if ($searchQuery !== ''): ?>
+        <?php if ($selectedCategories === []): ?>
+        <p>No category is selected, so there's nothing to fetch. Check at least one of World, Science, or Finance above.</p>
+        <?php elseif ($searchQuery !== ''): ?>
         <p>No stories matching &ldquo;<?= h($searchQuery) ?>&rdquo; cleared cross-validation on this run. Search only covers articles fetched just now, not a historical archive, so a narrow search term can easily fall under the <?= (int) $config['min_sources_required'] ?>-source bar even if the story itself is real.</p>
         <p><a href="?">Clear the search</a> to see all validated stories, or try a broader term.</p>
         <?php else: ?>
@@ -199,7 +232,7 @@ function highlightQuery(string $text, string $query): string
 </main>
 
 <footer class="site-footer">
-    <p>Sources polled this run: <?= h(implode(', ', array_column($config['sources'], 'name'))) ?></p>
+    <p>Sources polled this run: <?= h(implode(', ', array_column($filteredSources, 'name')) ?: 'none') ?></p>
     <p>This page re-runs the entire fetch-and-verify pipeline on every visit — nothing is cached or stored.</p>
 </footer>
 

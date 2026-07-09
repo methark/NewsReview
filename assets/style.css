@@ -84,9 +84,10 @@ body {
 .search-form {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin: 0 0 0.75rem;
-    max-width: 480px;
+    max-width: 620px;
 }
 
 .search-form input[type="text"] {
@@ -123,6 +124,30 @@ body {
     font-size: 0.85rem;
     color: var(--text-muted);
     white-space: nowrap;
+}
+
+.category-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    flex-basis: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.category-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.category-checkbox input {
+    cursor: pointer;
 }
 
 .run-meta {

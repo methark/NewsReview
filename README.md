@@ -33,6 +33,17 @@ articles are also matched when they share a specific proper-noun phrase
 unrelated, since news outlets often describe the same story very
 differently while still naming the same people, places, or organizations.
 
+Coverage is scoped to World, Science, and Finance — checkboxes at the top
+let you narrow to just one or two. Sports and celebrity/gossip content is
+never included: no such outlets are configured, and a keyword filter
+additionally strips that content out even if it slips into an otherwise
+on-topic "World" feed. Articles phrased as a question or speculation
+("Will NATO get involved in securing the Strait of Hormuz?") are excluded
+entirely — a question about what might happen isn't a fact, even when it
+accurately summarizes what a real news piece discusses — and the same
+check strips individual speculative sentences out of an otherwise-factual
+article's body.
+
 ## Requirements
 
 - PHP 8.1+ with the `curl` and `SimpleXML` extensions
@@ -47,7 +58,8 @@ Then open `http://localhost:8000/index.php`.
 
 ## Configuration
 
-Edit `config.php` to change the source outlets, the minimum number of
+Edit `config.php` to change the source outlets (each tagged with a
+`category` of `world`, `science`, or `finance`), the minimum number of
 outlets required to validate a story, the clustering similarity
 threshold, the article age window, how many validated stories are
 computed per run (`max_stories_shown`), or how many are shown per
@@ -71,3 +83,12 @@ scroll batch (`stories_per_batch`).
 - `src/ArticleSearch.php` — filters fetched articles by a search query
   before clustering, so search results are cross-checked the same way
   as the unfiltered view.
+- `src/TopicFilter.php` — keyword-based exclusion of sports and
+  celebrity/gossip content, applied to every fetched article regardless
+  of which feed it came from.
+
+Speculative or question-framed articles (`TextUtils::isSpeculative`) are
+rejected entirely at the fetch stage in `FeedFetcher`, so they never
+enter clustering, search, or the fact-checker — and the same check also
+strips individual speculative sentences out of an otherwise-admitted
+article's body in `FactChecker`.

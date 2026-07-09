@@ -21,8 +21,8 @@ final class FactChecker
         $title = self::pickTitle($cluster);
         $latestTimestamp = max(array_map(static fn (array $a): int => $a['published_at'] ?? 0, $cluster));
 
-        [$filteredFacts, $removedBiased, $removedOpinion, $keptCount] = self::buildFilteredArticle($cluster);
-        $considerations = self::buildConsiderations($cluster, $removedBiased, $removedOpinion, $keptCount);
+        [$filteredFacts, $removedBiased, $removedOpinion, $removedSpeculative, $keptCount] = self::buildFilteredArticle($cluster);
+        $considerations = self::buildConsiderations($cluster, $removedBiased, $removedOpinion, $removedSpeculative, $keptCount);
 
         $resources = array_map(static fn (array $a): array => [
             'name' => $a['source_name'],
@@ -56,7 +56,7 @@ final class FactChecker
         usort($titles, static fn (string $a, string $b): int => mb_strlen($a) <=> mb_strlen($b));
 
         foreach ($titles as $title) {
-            if (!TextUtils::isBiased($title)) {
+            if (!TextUtils::isBiased($title) && !TextUtils::isSpeculative($title)) {
                 return $title;
             }
         }
@@ -70,13 +70,14 @@ final class FactChecker
      * corroborated (or at least not contradicted) across sources.
      *
      * @param array<int, array<string, mixed>> $cluster
-     * @return array{0: string[], 1: int, 2: int, 3: int} [sentences, removedBiasedCount, removedOpinionCount, keptCount]
+     * @return array{0: string[], 1: int, 2: int, 3: int, 4: int} [sentences, removedBiasedCount, removedOpinionCount, removedSpeculativeCount, keptCount]
      */
     private static function buildFilteredArticle(array $cluster): array
     {
         $candidates = []; // normalized => ['text' => ..., 'sources' => Set<string>]
         $removedBiased = 0;
         $removedOpinion = 0;
+        $removedSpeculative = 0;
 
         foreach ($cluster as $article) {
             $sentences = TextUtils::splitSentences($article['description']);
@@ -90,6 +91,10 @@ final class FactChecker
                 }
                 if (TextUtils::isOpinion($sentence)) {
                     $removedOpinion++;
+                    continue;
+                }
+                if (TextUtils::isSpeculative($sentence)) {
+                    $removedSpeculative++;
                     continue;
                 }
                 $key = TextUtils::normalizeForDedup($sentence);
@@ -121,7 +126,7 @@ final class FactChecker
         $selected = array_slice($folded, 0, 6);
         $sentences = array_map(static fn (array $c): string => $c['text'], $selected);
 
-        return [$sentences, $removedBiased, $removedOpinion, count($selected)];
+        return [$sentences, $removedBiased, $removedOpinion, $removedSpeculative, count($selected)];
     }
 
     /**
@@ -162,7 +167,7 @@ final class FactChecker
      * @param array<int, array<string, mixed>> $cluster
      * @return string[]
      */
-    private static function buildConsiderations(array $cluster, int $removedBiased, int $removedOpinion, int $keptCount): array
+    private static function buildConsiderations(array $cluster, int $removedBiased, int $removedOpinion, int $removedSpeculative, int $keptCount): array
     {
         $considerations = [];
         $sourceCount = count($cluster);
@@ -175,6 +180,9 @@ final class FactChecker
         }
         if ($removedOpinion > 0) {
             $considerations[] = "Removed {$removedOpinion} sentence(s) reading as unattributed opinion rather than reporting.";
+        }
+        if ($removedSpeculative > 0) {
+            $considerations[] = "Removed {$removedSpeculative} sentence(s) posing a question or speculating about what might happen rather than reporting a settled fact.";
         }
 
         // Flag numeric discrepancies across sources (e.g. different death

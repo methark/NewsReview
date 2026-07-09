@@ -40,6 +40,36 @@ final class TextUtils
         'everyone knows', 'it is obvious', 'without a doubt',
     ];
 
+    /**
+     * @var string[] leading phrases that mark a headline/sentence as posing
+     * a question or hypothetical rather than reporting a settled fact,
+     * matched against the very first word(s) only. "Is"/"Are"/"Does"/"Do"/
+     * "Can"/"Could"/"Might"/"Should"/"Would" leading a headline is, in
+     * standard English word order, almost always a question ("Is Bitcoin a
+     * bubble?") rather than a declarative statement. "Will" is deliberately
+     * excluded from the bare-word form since it's also a common first name
+     * ("Will Smith attends premiere") — a trailing "?" (checked separately)
+     * still catches "Will"-led questions without that false-positive risk.
+     */
+    public static array $speculativeOpeners = [
+        'is ', 'are ', 'does ', 'do ', 'can ', 'could ', 'might ', 'should ', 'would ',
+        'is it ', 'are we ', 'is there ', 'are there ', 'what if ', 'why would ',
+        'how could ', 'could this ', 'might this ', 'wonder if ',
+    ];
+
+    /**
+     * @var string[] phrases that mark speculation when they appear anywhere
+     * in a sentence, not just as the opener — "Analysts wonder if the
+     * merger will be approved" poses the same open question as a headline
+     * ending in "?", just phrased as reported hedging instead.
+     */
+    public static array $speculativeMarkers = [
+        'wonder if', 'wonders if', 'wondering if', 'raises the question of whether',
+        'raises questions about whether', 'remains unclear whether', 'remains to be seen whether',
+        'remains to be seen if', 'it is uncertain whether', "it's uncertain whether",
+        'unclear whether', 'some speculate', 'speculation that', 'may or may not',
+    ];
+
     public static function stripHtml(string $text): string
     {
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -208,6 +238,33 @@ final class TextUtils
         $lower = mb_strtolower($sentence);
         foreach (self::$opinionMarkers as $term) {
             if (str_contains($lower, $term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True if $text poses a question or hypothetical rather than reporting
+     * a settled fact — "Will NATO get involved in securing the Strait of
+     * Hormuz?" is speculation about what might happen, not a fact, even
+     * though it may accurately summarize what a real news piece discusses.
+     */
+    public static function isSpeculative(string $text): bool
+    {
+        $trimmed = trim($text, " \t\n\r\0\x0B\"'“”");
+        if ($trimmed !== '' && str_ends_with($trimmed, '?')) {
+            return true;
+        }
+
+        $lower = mb_strtolower($trimmed);
+        foreach (self::$speculativeOpeners as $opener) {
+            if (str_starts_with($lower, $opener)) {
+                return true;
+            }
+        }
+        foreach (self::$speculativeMarkers as $marker) {
+            if (str_contains($lower, $marker)) {
                 return true;
             }
         }

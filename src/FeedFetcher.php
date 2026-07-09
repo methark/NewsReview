@@ -121,10 +121,10 @@ final class FeedFetcher
             }
 
             $parsed = self::parseFeed($body, $source);
-            if ($parsed === []) {
+            if (!$parsed['xmlParsed']) {
                 $failures[] = ['source' => $source, 'reason' => 'unparsable feed', 'transient' => false];
             } else {
-                array_push($articles, ...$parsed);
+                array_push($articles, ...$parsed['items']);
             }
 
             curl_multi_remove_handle($multiHandle, $ch);
@@ -138,7 +138,7 @@ final class FeedFetcher
 
     /**
      * @param array{name: string, homepage: string, feed: string} $source
-     * @return array<int, array<string, mixed>>
+     * @return array{xmlParsed: bool, items: array<int, array<string, mixed>>}
      */
     private static function parseFeed(string $body, array $source): array
     {
@@ -166,7 +166,15 @@ final class FeedFetcher
         libxml_use_internal_errors($previous);
 
         if ($xml === false) {
-            return [];
+            return ['xmlParsed' => false, 'items' => []];
+        }
+
+        // A response can be well-formed XML/HTML (a bot-check or error
+        // page, say) without being a recognizable feed at all — that's
+        // still a failure, distinct from a real feed whose items all got
+        // filtered out below by content rules.
+        if (!isset($xml->channel->item) && !isset($xml->item) && !isset($xml->entry)) {
+            return ['xmlParsed' => false, 'items' => []];
         }
 
         $items = [];
@@ -187,7 +195,10 @@ final class FeedFetcher
             }
         }
 
-        return array_values(array_filter($items, static fn (?array $a): bool => $a !== null && $a['title'] !== ''));
+        // A feed that parsed fine but currently has zero admissible items
+        // (e.g. everything in it right now is sports/gossip/speculative) is
+        // not a failure — it's just nothing to contribute this run.
+        return ['xmlParsed' => true, 'items' => array_values(array_filter($items, static fn (?array $a): bool => $a !== null))];
     }
 
     /**
@@ -224,7 +235,7 @@ final class FeedFetcher
         $dateRaw = (string) ($item->pubDate ?? $dc->date ?? '');
         $timestamp = $dateRaw !== '' ? strtotime($dateRaw) : false;
 
-        if ($title === '') {
+        if ($title === '' || self::isRejected($title, $description)) {
             return null;
         }
 
@@ -236,6 +247,17 @@ final class FeedFetcher
             'source_homepage' => $source['homepage'],
             'published_at' => $timestamp !== false ? $timestamp : null,
         ];
+    }
+
+    /**
+     * True if the article shouldn't enter the pipeline at all: a
+     * speculative/question-framed headline isn't a reported fact, and
+     * sports/gossip content falls outside the Science/World/Finance scope
+     * regardless of which feed it happened to come through.
+     */
+    private static function isRejected(string $title, string $description): bool
+    {
+        return TextUtils::isSpeculative($title) || TopicFilter::isSportsOrGossip($title . ' ' . $description);
     }
 
     /**
@@ -260,7 +282,7 @@ final class FeedFetcher
         $dateRaw = (string) ($entry->updated ?? $entry->published ?? '');
         $timestamp = $dateRaw !== '' ? strtotime($dateRaw) : false;
 
-        if ($title === '') {
+        if ($title === '' || self::isRejected($title, $description)) {
             return null;
         }
 
