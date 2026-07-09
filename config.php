@@ -34,9 +34,12 @@ return [
         ['name' => 'Al Arabiya (EN)', 'homepage' => 'https://english.alarabiya.net', 'feed' => 'https://english.alarabiya.net/.mrss/en.xml'],
     ],
 
-    // Network behaviour: page must render fresh every visit, so keep fetches short.
-    'fetch_timeout_seconds'       => 6,
-    'fetch_connect_timeout_seconds' => 4,
+    // Network behaviour: page must render fresh every visit, so keep fetches
+    // reasonably short. Connections are capped at 6 concurrent (see
+    // FeedFetcher), so with 20+ sources some feeds queue behind others —
+    // give slightly more headroom than a single-burst fetch would need.
+    'fetch_timeout_seconds'       => 10,
+    'fetch_connect_timeout_seconds' => 6,
 
     // Only consider articles published within this window, so "today's" cross-checks
     // aren't polluted by an old story resurfacing on one outlet.

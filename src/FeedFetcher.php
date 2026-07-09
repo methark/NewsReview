@@ -16,6 +16,16 @@ final class FeedFetcher
     public static function fetchAll(array $sources, int $connectTimeout, int $timeout): array
     {
         $multiHandle = curl_multi_init();
+
+        // Cap how many transfers run concurrently. Firing every configured
+        // source at once (one connection each) is easy to trip up on a
+        // typical desktop/XAMPP box — Windows Firewall, antivirus, or just
+        // the local network stack can throttle a burst of simultaneous
+        // outbound HTTPS connections, which shows up as otherwise-healthy
+        // feeds failing with an empty curl error and HTTP code 0. Curl
+        // queues the rest internally and starts them as slots free up.
+        curl_multi_setopt($multiHandle, CURLMOPT_MAXCONNECTS, 6);
+
         $handles = [];
 
         foreach ($sources as $source) {
@@ -54,7 +64,12 @@ final class FeedFetcher
             $body = curl_multi_getcontent($ch);
 
             if ($body === null || $body === '' || $error !== '' || $httpCode >= 400) {
-                $failed[] = $source['name'] . ($error !== '' ? " ({$error})" : " (HTTP {$httpCode})");
+                $reason = match (true) {
+                    $error !== '' => $error,
+                    $httpCode > 0 => "HTTP {$httpCode}",
+                    default => 'connection failed or timed out',
+                };
+                $failed[] = "{$source['name']} ({$reason})";
                 curl_multi_remove_handle($multiHandle, $ch);
                 curl_close($ch);
                 continue;
