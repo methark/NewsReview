@@ -17,7 +17,6 @@ return [
         ['name' => 'Deutsche Welle','homepage' => 'https://www.dw.com',               'feed' => 'https://rss.dw.com/rdf/rss-en-all'],
         ['name' => 'CBS News',      'homepage' => 'https://www.cbsnews.com',          'feed' => 'https://www.cbsnews.com/latest/rss/world'],
         ['name' => 'ABC News (AU)', 'homepage' => 'https://www.abc.net.au/news',      'feed' => 'https://www.abc.net.au/news/feed/51120/rss.xml'],
-        ['name' => 'Reuters (via feed)', 'homepage' => 'https://www.reuters.com',     'feed' => 'https://www.reutersagency.com/feed/?best-topics=top-news&post_type=best'],
         ['name' => 'Le Monde (EN)', 'homepage' => 'https://www.lemonde.fr/en',        'feed' => 'https://www.lemonde.fr/en/rss/une.xml'],
     ],
 
@@ -29,8 +28,9 @@ return [
     // aren't polluted by an old story resurfacing on one outlet.
     'max_article_age_hours' => 48,
 
-    // Clustering: minimum token-overlap (Jaccard similarity) for two headlines
-    // from different outlets to be treated as the same story.
+    // Clustering: minimum blended token-overlap score (Jaccard + overlap
+    // coefficient, averaged) for two articles from different outlets to be
+    // treated as the same story.
     'similarity_threshold' => 0.30,
 
     // A "fact-checked" story requires independent confirmation from at least
