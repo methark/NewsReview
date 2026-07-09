@@ -98,6 +98,7 @@ final class FeedFetcher
             $source = $entry['source'];
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $error = curl_error($ch);
+            $errno = curl_errno($ch);
             $body = curl_multi_getcontent($ch);
 
             if ($body === null || $body === '' || $error !== '' || $httpCode >= 400) {
@@ -105,6 +106,12 @@ final class FeedFetcher
                 $reason = match (true) {
                     $error !== '' => $error,
                     $httpCode > 0 => "HTTP {$httpCode}",
+                    // curl_error() text is sometimes empty on Windows even
+                    // when curl_errno() has a real code (seen with the
+                    // Schannel SSL backend some XAMPP/Windows PHP builds
+                    // use) — surface the numeric code so a recurring failure
+                    // is diagnosable instead of a bare "timed out".
+                    $errno !== 0 => "connection failed, curl error {$errno}",
                     default => 'connection failed or timed out',
                 };
                 $failures[] = ['source' => $source, 'reason' => $reason, 'transient' => $isEmptyBodyWith2xx];
