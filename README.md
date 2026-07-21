@@ -71,6 +71,24 @@ article's body.
   the PHP backend) will show a clear "couldn't reach the backend" message
   rather than silently failing.
 
+- **`revue-standalone.html`** — an experimental, genuinely no-backend
+  edition: the entire fetch/cluster/fact-check pipeline above is
+  reimplemented in plain JavaScript, running only in the browser (no PHP
+  at all). Since browsers can't fetch cross-origin RSS feeds any more
+  than they can fetch arbitrary websites, it routes each feed through a
+  public CORS-proxy service (with a second proxy as fallback), then
+  parses, clusters, and fact-checks client-side, caching results in
+  `localStorage` for an hour. A "Start auto-refresh" toggle polls again
+  every few minutes until you click "Stop" — deliberately not a tight
+  non-stop loop, since hammering a free proxy as fast as possible gets it
+  to block the page within seconds. This is a parallel reimplementation,
+  not a call into the PHP pipeline, so it's independently maintained and
+  can drift from it over time; it's also meaningfully less reliable,
+  since it depends entirely on third-party proxy services outside this
+  project's control (rate limits, downtime, or a policy change can break
+  it with no warning). Keep using `index.php`/`revue.html` if you want
+  the same guarantees as the rest of this project.
+
 ## Requirements
 
 - PHP 8.1+ with the `curl` and `SimpleXML` extensions
