@@ -51,6 +51,26 @@ accurately summarizes what a real news piece discusses — and the same
 check strips individual speculative sentences out of an otherwise-factual
 article's body.
 
+## Two frontends, one backend
+
+- **`index.php`** — the full server-rendered dashboard described above.
+- **`revue.html`** ("The News Revue") — a single static HTML/CSS/JS file
+  implementing the same Trinary Method (a story only ever shows once at
+  least 3 high-fidelity sources confirm it) with a "Search the Web" field,
+  talking to a JSON endpoint (**`api.php`**) instead of rendering HTML
+  server-side. Both frontends and the JSON endpoint run the *exact same*
+  pipeline (`src/NewsPipeline.php`) — same sources, same cache, same
+  3-source validation, same bias/speculation filtering — just different
+  presentations of it, so results can never drift between them.
+
+  A browser can't fetch arbitrary news sites directly (cross-origin
+  restrictions block it), and a real web-search API needs a paid/keyed
+  service — so `revue.html` isn't a fully standalone file with no backend;
+  it needs `api.php` served alongside it on the same PHP server. Opening
+  `revue.html` directly as a local file (or hosting it somewhere without
+  the PHP backend) will show a clear "couldn't reach the backend" message
+  rather than silently failing.
+
 ## Requirements
 
 - PHP 8.1+ with the `curl` and `SimpleXML` extensions
@@ -61,7 +81,7 @@ article's body.
 php -S localhost:8000
 ```
 
-Then open `http://localhost:8000/index.php`.
+Then open `http://localhost:8000/index.php` or `http://localhost:8000/revue.html`.
 
 ## Configuration
 
@@ -97,8 +117,14 @@ batch (`stories_per_batch`), or the cache behavior
 - `src/StoryCache.php` — reads/writes the cached article pool that
   `index.php` uses when it's fresh, and `refresh.php` writes to on a
   forced or scheduled run.
+- `src/NewsPipeline.php` — the shared fetch/cache/filter/cluster/fact-check
+  pipeline both `index.php` and `api.php` call, so the two frontends can't
+  run different logic against the same data.
 - `refresh.php` — standalone script that fetches every configured
   source and writes the cache, independent of any page visit.
+- `api.php` — JSON version of the pipeline's output, consumed by
+  `revue.html`.
+- `revue.html` — the standalone frontend described above.
 
 Speculative or question-framed articles (`TextUtils::isSpeculative`) are
 rejected entirely at the fetch stage in `FeedFetcher`, so they never

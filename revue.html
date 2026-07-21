@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The News Revue — Trinary Method Fact Check</title>
+<style>
+:root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --text: #1a1d23;
+    --text-muted: #5a616b;
+    --border: #e2e4e8;
+    --accent: #1d5fae;
+    --warning-bg: #fff6e5;
+    --warning-text: #7a5b00;
+    --error-bg: #fdeaea;
+    --error-text: #8a2222;
+    --mark-bg: #fff2a8;
+    --mark-text: #1a1d23;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #14161a;
+        --surface: #1d2025;
+        --text: #e8e9eb;
+        --text-muted: #9aa0aa;
+        --border: #2c2f36;
+        --accent: #6fa8ff;
+        --warning-bg: #332900;
+        --warning-text: #e0bd5f;
+        --error-bg: #3a1414;
+        --error-text: #ff9b9b;
+        --mark-bg: #5a4a00;
+        --mark-text: #ffe28a;
+    }
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+}
+
+mark {
+    background: var(--mark-bg);
+    color: var(--mark-text);
+    border-radius: 3px;
+    padding: 0 0.15em;
+}
+
+.site-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 1.5rem 1.5rem;
+}
+
+.header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+.site-header h1 {
+    margin: 0 0 0.25rem;
+    font-size: 1.75rem;
+    letter-spacing: -0.02em;
+}
+
+.tagline {
+    margin: 0 0 0.75rem;
+    color: var(--text-muted);
+    max-width: 640px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.search-form {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+    max-width: 620px;
+}
+
+.search-form input[type="text"] {
+    flex: 1;
+    min-width: 180px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+.search-form input[type="text"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.search-form button.primary {
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.search-form button.primary:hover {
+    opacity: 0.9;
+}
+
+.clear-search {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.category-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    flex-basis: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.category-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.category-checkbox input {
+    cursor: pointer;
+}
+
+.run-meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    min-height: 1.2em;
+}
+
+.fetch-warning {
+    margin: 0.75rem 0 0;
+    padding: 0.5rem 0.75rem;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.backend-error {
+    margin: 0.75rem 0 0;
+    padding: 0.75rem;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.backend-error code {
+    background: rgba(0, 0, 0, 0.12);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+}
+
+.story-list {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.empty-state, .loading-state {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    color: var(--text-muted);
+}
+
+.story-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+}
+
+.story-card[hidden] {
+    display: none;
+}
+
+.story-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.3rem;
+}
+
+.story-datetime {
+    margin: 0 0 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.story-section {
+    margin-top: 1rem;
+}
+
+.story-section h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.filtered-article, .considerations, .resources {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.filtered-article li {
+    margin-bottom: 0.4rem;
+}
+
+.considerations li {
+    margin-bottom: 0.35rem;
+    color: var(--text-muted);
+}
+
+.resources li {
+    margin-bottom: 0.3rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.resources a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.resources a:hover {
+    text-decoration: underline;
+}
+
+.resource-date {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.scroll-sentinel {
+    height: 1px;
+}
+
+.load-more-row {
+    display: flex;
+    justify-content: center;
+}
+
+.load-more-button {
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.load-more-button:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.scroll-status {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.site-footer {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+</style>
+</head>
+<body>
+<header class="site-header">
+    <div class="header-inner">
+        <h1>The News Revue</h1>
+        <p class="tagline">The Trinary Method: a story is only shown here once at least 3 independent, high-fidelity sources confirm it. Biased, speculative, and unattributed-opinion language is filtered out before you ever see it.</p>
+
+        <form id="searchForm" class="search-form">
+            <label for="searchInput" class="sr-only">Search the Web</label>
+            <input type="text" id="searchInput" placeholder="Search the Web for a phrase or word&hellip;" maxlength="120" autocomplete="off">
+            <button type="submit" class="primary">Search the Web</button>
+            <button type="button" id="clearButton" class="clear-search" hidden>Clear</button>
+
+            <fieldset class="category-filter">
+                <legend class="sr-only">Filter by category</legend>
+                <label class="category-checkbox"><input type="checkbox" class="cat-checkbox" value="world" checked> World</label>
+                <label class="category-checkbox"><input type="checkbox" class="cat-checkbox" value="science" checked> Science</label>
+                <label class="category-checkbox"><input type="checkbox" class="cat-checkbox" value="finance" checked> Finance</label>
+            </fieldset>
+        </form>
+
+        <p id="runMeta" class="run-meta"></p>
+        <div id="statusArea"></div>
+    </div>
+</header>
+
+<main class="story-list" id="storyList">
+    <div class="loading-state" id="initialLoading">Running the Trinary Method against this run's sources&hellip;</div>
+</main>
+
+<footer class="site-footer">
+    <p>The News Revue is a frontend for the same fetch-cross-check-filter pipeline as the NewsReview dashboard (<code>index.php</code>) — same sources, same 3-source validation, same bias/speculation filtering — just a different presentation, talking to it via <code>api.php</code>.</p>
+    <p>A browser can't fetch arbitrary news sites directly (cross-origin restrictions block it) and a real web-search API needs a paid/keyed service, so this page's "Search the Web" reads from <code>api.php</code> on the same server rather than querying the open web directly.</p>
+</footer>
+
+<script>
+(function () {
+    'use strict';
+
+    var API_ENDPOINT = 'api.php';
+    var BATCH_SIZE = 10;
+
+    var searchForm = document.getElementById('searchForm');
+    var searchInput = document.getElementById('searchInput');
+    var clearButton = document.getElementById('clearButton');
+    var catCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.cat-checkbox'));
+    var runMeta = document.getElementById('runMeta');
+    var statusArea = document.getElementById('statusArea');
+    var storyList = document.getElementById('storyList');
+
+    var allStories = [];
+    var revealedCount = 0;
+    var scrollObserver = null;
+
+    function selectedCategories() {
+        return catCheckboxes.filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
+    }
+
+    function buildUrl(query, categories) {
+        var params = new URLSearchParams();
+        if (query !== '') {
+            params.set('q', query);
+        }
+        categories.forEach(function (c) { params.append('cat[]', c); });
+        return API_ENDPOINT + '?' + params.toString();
+    }
+
+    function clearChildren(node) {
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
+    }
+
+    // Splits text on whitespace-separated query terms and wraps
+    // case-insensitive matches in <mark>, built entirely via DOM nodes
+    // (never innerHTML) so there is no way for fetched or typed text to
+    // inject markup.
+    function appendHighlighted(container, text, query) {
+        var terms = query.trim().length
+            ? query.trim().split(/\s+/).filter(function (t) { return t.length > 0; })
+            : [];
+
+        if (terms.length === 0) {
+            container.appendChild(document.createTextNode(text));
+            return;
+        }
+
+        var pattern = new RegExp('(' + terms.map(function (t) {
+            return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }).join('|') + ')', 'ig');
+
+        var lastIndex = 0;
+        var match;
+        while ((match = pattern.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+            }
+            var mark = document.createElement('mark');
+            mark.textContent = match[0];
+            container.appendChild(mark);
+            lastIndex = match.index + match[0].length;
+            if (match.index === pattern.lastIndex) {
+                pattern.lastIndex++;
+            }
+        }
+        if (lastIndex < text.length) {
+            container.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+    }
+
+    function buildStoryCard(story, index, query) {
+        var card = document.createElement('article');
+        card.className = 'story-card';
+        if (index >= BATCH_SIZE) {
+            card.hidden = true;
+        }
+
+        var title = document.createElement('h2');
+        title.className = 'story-title';
+        appendHighlighted(title, story.title, query);
+        card.appendChild(title);
+
+        var datetime = document.createElement('p');
+        datetime.className = 'story-datetime';
+        datetime.textContent = story.published_at_display;
+        card.appendChild(datetime);
+
+        card.appendChild(buildSection('The Filtered Article', 'filtered-article', story.filtered_facts, function (li, fact) {
+            appendHighlighted(li, fact, query);
+        }));
+
+        card.appendChild(buildSection('Considerations', 'considerations', story.considerations, function (li, note) {
+            li.textContent = note;
+        }));
+
+        var resourcesHeading = 'Resources (' + story.resources.length + ')';
+        var resourcesSection = document.createElement('section');
+        resourcesSection.className = 'story-section';
+        var h3 = document.createElement('h3');
+        h3.textContent = resourcesHeading;
+        resourcesSection.appendChild(h3);
+        var ul = document.createElement('ul');
+        ul.className = 'resources';
+        story.resources.forEach(function (resource) {
+            var li = document.createElement('li');
+            var a = document.createElement('a');
+            a.href = resource.link;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer nofollow';
+            a.textContent = resource.name;
+            var span = document.createElement('span');
+            span.className = 'resource-date';
+            span.textContent = resource.published_at_display;
+            li.appendChild(a);
+            li.appendChild(span);
+            ul.appendChild(li);
+        });
+        resourcesSection.appendChild(ul);
+        card.appendChild(resourcesSection);
+
+        return card;
+    }
+
+    function buildSection(heading, listClass, items, fillItem) {
+        var section = document.createElement('section');
+        section.className = 'story-section';
+        var h3 = document.createElement('h3');
+        h3.textContent = heading;
+        section.appendChild(h3);
+        var ul = document.createElement('ul');
+        ul.className = listClass;
+        items.forEach(function (item) {
+            var li = document.createElement('li');
+            fillItem(li, item);
+            ul.appendChild(li);
+        });
+        section.appendChild(ul);
+        return section;
+    }
+
+    function renderEmptyState(message) {
+        var div = document.createElement('div');
+        div.className = 'empty-state';
+        var p = document.createElement('p');
+        p.textContent = message;
+        div.appendChild(p);
+        return div;
+    }
+
+    function setupLoadMore() {
+        var existingSentinel = document.getElementById('scrollSentinel');
+        if (existingSentinel) {
+            existingSentinel.remove();
+        }
+        var existingRow = document.querySelector('.load-more-row');
+        if (existingRow) {
+            existingRow.remove();
+        }
+        var existingStatus = document.getElementById('scrollStatus');
+        if (existingStatus) {
+            existingStatus.remove();
+        }
+        if (scrollObserver) {
+            scrollObserver.disconnect();
+            scrollObserver = null;
+        }
+
+        if (allStories.length <= BATCH_SIZE) {
+            return;
+        }
+
+        revealedCount = BATCH_SIZE;
+
+        var sentinel = document.createElement('div');
+        sentinel.id = 'scrollSentinel';
+        sentinel.className = 'scroll-sentinel';
+        sentinel.setAttribute('aria-hidden', 'true');
+        storyList.appendChild(sentinel);
+
+        var row = document.createElement('div');
+        row.className = 'load-more-row';
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'load-more-button';
+        row.appendChild(button);
+        storyList.appendChild(row);
+
+        var status = document.createElement('p');
+        status.id = 'scrollStatus';
+        status.className = 'scroll-status';
+        status.hidden = true;
+        status.textContent = 'All validated stories for this run are shown.';
+        storyList.appendChild(status);
+
+        function updateLabel() {
+            var remaining = allStories.length - revealedCount;
+            button.textContent = 'Load ' + Math.min(BATCH_SIZE, remaining) + ' more stories (' + remaining + ' remaining)';
+        }
+
+        function revealNextBatch() {
+            var cards = storyList.querySelectorAll('.story-card[hidden]');
+            var toReveal = Array.prototype.slice.call(cards, 0, BATCH_SIZE);
+            toReveal.forEach(function (card) { card.removeAttribute('hidden'); });
+            revealedCount += toReveal.length;
+
+            if (revealedCount >= allStories.length) {
+                if (scrollObserver) {
+                    scrollObserver.disconnect();
+                }
+                sentinel.remove();
+                row.remove();
+                status.hidden = false;
+            } else {
+                updateLabel();
+            }
+        }
+
+        button.addEventListener('click', revealNextBatch);
+        updateLabel();
+
+        if ('IntersectionObserver' in window) {
+            scrollObserver = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) {
+                        revealNextBatch();
+                    }
+                });
+            }, { rootMargin: '400px 0px' });
+            scrollObserver.observe(sentinel);
+        }
+    }
+
+    function render(data, query) {
+        allStories = data.stories;
+        clearChildren(storyList);
+
+        var meta = data.meta;
+        var metaParts = [];
+        metaParts.push(meta.used_cache ? 'Data as of ' + meta.fetched_at_display : 'Checked just now');
+        metaParts.push(meta.articles_scanned + ' articles scanned across ' + meta.outlets_considered + ' outlets');
+        if (meta.search_query) {
+            metaParts.push(meta.articles_matched + ' match “' + meta.search_query + '”');
+        }
+        metaParts.push(meta.stories_found + ' stories passed validation');
+        metaParts.push('generated in ' + meta.generated_in_seconds + 's');
+        runMeta.textContent = metaParts.join(' · ');
+
+        clearChildren(statusArea);
+        if (meta.failed_sources && meta.failed_sources.length > 0) {
+            var warning = document.createElement('p');
+            warning.className = 'fetch-warning';
+            warning.textContent = (meta.used_cache ? 'Unreachable at last refresh' : 'Unreachable this run') + ': ' + meta.failed_sources.join(', ');
+            statusArea.appendChild(warning);
+        }
+
+        if (allStories.length === 0) {
+            var message = meta.categories.length === 0
+                ? 'No category is selected, so there is nothing to fetch. Check at least one of World, Science, or Finance above.'
+                : query
+                    ? 'No stories matching “' + query + '” cleared cross-validation by the Trinary Method (at least ' + meta.min_sources_required + ' high-fidelity sources). Try a broader term.'
+                    : 'No stories cleared cross-validation on this run. This can happen if too few source feeds were reachable, or if nothing was independently confirmed by ' + meta.min_sources_required + '+ outlets recently.';
+            storyList.appendChild(renderEmptyState(message));
+            return;
+        }
+
+        allStories.forEach(function (story, index) {
+            storyList.appendChild(buildStoryCard(story, index, query));
+        });
+
+        setupLoadMore();
+    }
+
+    function renderBackendError(err) {
+        clearChildren(storyList);
+        var div = document.createElement('div');
+        div.className = 'backend-error';
+        var p1 = document.createElement('p');
+        p1.textContent = 'Could not reach the fact-checking backend (' + API_ENDPOINT + ').';
+        var p2 = document.createElement('p');
+        p2.textContent = 'This page needs to be served from the same folder as your NewsReview PHP install, with the server actually running — e.g. http://localhost/NewsReview/revue.html, not opened as a local file. Details: ' + (err && err.message ? err.message : String(err));
+        div.appendChild(p1);
+        div.appendChild(p2);
+        storyList.appendChild(div);
+        runMeta.textContent = '';
+    }
+
+    function runQuery(query) {
+        var categories = selectedCategories();
+        clearButton.hidden = query === '';
+
+        var loading = document.getElementById('initialLoading');
+        if (loading) {
+            loading.textContent = 'Running the Trinary Method against this run’s sources…';
+        } else {
+            clearChildren(storyList);
+            var loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading-state';
+            loadingDiv.id = 'initialLoading';
+            loadingDiv.textContent = 'Running the Trinary Method against this run’s sources…';
+            storyList.appendChild(loadingDiv);
+        }
+
+        fetch(buildUrl(query, categories))
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                render(data, query);
+            })
+            .catch(function (err) {
+                renderBackendError(err);
+            });
+    }
+
+    searchForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        runQuery(searchInput.value.trim());
+    });
+
+    clearButton.addEventListener('click', function () {
+        searchInput.value = '';
+        clearButton.hidden = true;
+        runQuery('');
+    });
+
+    catCheckboxes.forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            runQuery(searchInput.value.trim());
+        });
+    });
+
+    // Must load with validated news already showing, same as the PHP
+    // dashboard's default view — no search term, default categories.
+    runQuery('');
+})();
+</script>
+</body>
+</html>
