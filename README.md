@@ -81,7 +81,10 @@ article's body.
   `localStorage` for an hour. A "Start auto-refresh" toggle polls again
   every few minutes until you click "Stop" — deliberately not a tight
   non-stop loop, since hammering a free proxy as fast as possible gets it
-  to block the page within seconds. This is a parallel reimplementation,
+  to block the page within seconds — and stops itself automatically after
+  15 minutes even if nobody clicks "Stop", so a left-open tab doesn't poll
+  indefinitely; this cap only applies to auto-refresh, never to a manual
+  "Search the Web" click. This is a parallel reimplementation,
   not a call into the PHP pipeline, so it's independently maintained and
   can drift from it over time; it's also meaningfully less reliable,
   since it depends entirely on third-party proxy services outside this

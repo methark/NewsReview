@@ -376,6 +376,7 @@ mark {
 
         <p id="runMeta" class="run-meta"></p>
         <div id="statusArea"></div>
+        <div id="autoRefreshNotice"></div>
     </div>
 </header>
 
@@ -457,6 +458,11 @@ mark {
     var CACHE_TTL_MS = 60 * 60 * 1000;
     var CACHE_KEY = 'newsRevueStandaloneCache.v1';
     var AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+    // Auto-refresh stops itself after this long, even if nobody clicks
+    // "Stop" — a left-open tab shouldn't poll a free third-party proxy
+    // indefinitely. Manual "Search the Web" runs are never subject to
+    // this; it only bounds the automatic polling loop.
+    var AUTO_REFRESH_MAX_DURATION_MS = 15 * 60 * 1000;
     var FETCH_TIMEOUT_MS = 12000;
 
     // ===== TextUtils: tokenizing, similarity, and bias/speculation detection =====
@@ -1058,11 +1064,13 @@ mark {
     var catCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.cat-checkbox'));
     var runMeta = document.getElementById('runMeta');
     var statusArea = document.getElementById('statusArea');
+    var autoRefreshNotice = document.getElementById('autoRefreshNotice');
     var storyList = document.getElementById('storyList');
 
     var allStories = [];
     var scrollObserver = null;
     var autoRefreshTimer = null;
+    var autoRefreshMaxTimer = null;
     var requestSeq = 0;
 
     function formatDateTimeDisplay(timestamp) {
@@ -1334,22 +1342,57 @@ mark {
         cb.addEventListener('change', function () { runQuery(searchInput.value.trim(), false); });
     });
 
-    autoRefreshToggle.addEventListener('click', function () {
+    function stopAutoRefresh(reasonNote) {
         if (autoRefreshTimer) {
             clearInterval(autoRefreshTimer);
             autoRefreshTimer = null;
-            autoRefreshToggle.textContent = 'Start auto-refresh';
-            autoRefreshToggle.classList.remove('active');
+        }
+        if (autoRefreshMaxTimer) {
+            clearTimeout(autoRefreshMaxTimer);
+            autoRefreshMaxTimer = null;
+        }
+        autoRefreshToggle.textContent = 'Start auto-refresh';
+        autoRefreshToggle.classList.remove('active');
+
+        // A dedicated element, not statusArea — render() clears statusArea
+        // on every completed fetch (including the very cycle that's
+        // in flight when this fires), which would wipe this notice before
+        // anyone saw it.
+        clearChildren(autoRefreshNotice);
+        if (reasonNote) {
+            var note = document.createElement('p');
+            note.className = 'fetch-warning';
+            note.textContent = reasonNote;
+            autoRefreshNotice.appendChild(note);
+        }
+    }
+
+    function startAutoRefresh() {
+        clearChildren(autoRefreshNotice);
+        autoRefreshToggle.innerHTML = '';
+        var dot = document.createElement('span');
+        dot.className = 'live-dot';
+        autoRefreshToggle.appendChild(dot);
+        autoRefreshToggle.appendChild(document.createTextNode('Stop auto-refresh'));
+        autoRefreshToggle.classList.add('active');
+
+        autoRefreshTimer = setInterval(function () {
+            runQuery(searchInput.value.trim(), true);
+        }, AUTO_REFRESH_INTERVAL_MS);
+
+        // Safety cap: a left-open tab shouldn't poll the proxy forever just
+        // because nobody remembered to click "Stop". Doesn't apply to a
+        // manual "Search the Web" click, which is unrelated to this timer.
+        autoRefreshMaxTimer = setTimeout(function () {
+            stopAutoRefresh('Auto-refresh stopped automatically after 15 minutes. Click "Start auto-refresh" to resume.');
+        }, AUTO_REFRESH_MAX_DURATION_MS);
+    }
+
+    autoRefreshToggle.addEventListener('click', function () {
+        if (autoRefreshTimer) {
+            stopAutoRefresh(null);
         } else {
-            autoRefreshToggle.innerHTML = '';
-            var dot = document.createElement('span');
-            dot.className = 'live-dot';
-            autoRefreshToggle.appendChild(dot);
-            autoRefreshToggle.appendChild(document.createTextNode('Stop auto-refresh'));
-            autoRefreshToggle.classList.add('active');
-            autoRefreshTimer = setInterval(function () {
-                runQuery(searchInput.value.trim(), true);
-            }, AUTO_REFRESH_INTERVAL_MS);
+            startAutoRefresh();
         }
     });
 
